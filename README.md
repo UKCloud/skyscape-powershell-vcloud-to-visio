@@ -1,7 +1,7 @@
 # skyscape-powershell-vcloud-to-visio
 Draws a vCloud Organisation in Microsoft Visio
 
-This PowerShell script will survey your vCloud Organisation via the API using light weight Search-Cloud and direct API commands, to create an in memory data object that depicts your vCloud Organisation. This is then used with Microsoft VISIO COM automation to draw the architecture for you.
+This PowerShell script will survey your vCloud Organisation via the API using light weight Search-Cloud and direct API commands (This is VIEW data only, no changes are made), to create an in memory data object that depicts your vCloud Organisation. This is then used with Microsoft VISIO COM automation to draw the architecture for you.
 
 Areas included in the structure are:
 
@@ -31,12 +31,9 @@ Your vCloud Organisation Name/ID
 Your vCloud Organisation UserName
 Your vCloud Organisation Password
 
+Note: For Skyscape customers, this is available from the Portal via the API dropdown option in the top right menu.
+
 Update the variables at the top of the script:
-
-#**********************************************************
-# VARIABLES
-#**********************************************************
-
 
 $Global:API = "api.vcd.portal.skyscapecloud.com"
 $Global:Username = "your_org_user_name"
