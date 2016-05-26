@@ -5,15 +5,15 @@ This PowerShell script will survey your vCloud Organisation via the API using li
 
 Areas included in the structure are:
 
-Virtual Datacenters
-VAPPS
-VM's - Including all Properties, stored in the shape data
-VAPP Networks
-OrgVDC Networks
-Network Connections & IP Addresses Between VM NIC's and Networks
-Network Connections between Networks and vShield Edges
-vShield Edges
-IPSEC VPN's between any vShield Edges within the Same Org
+ - Virtual Datacenters
+ - VAPPS
+ - VM's - Including all Properties, stored in the shape data
+ - VAPP Networks
+ - OrgVDC Networks
+ - Network Connections & IP Addresses Between VM NIC's and Networks
+ - Network Connections between Networks and vShield Edges
+ - vShield Edges
+ - IPSEC VPN's between any vShield Edges within the Same Org
 
 # Requirements
 
