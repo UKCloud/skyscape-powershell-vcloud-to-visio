@@ -25,20 +25,20 @@ You will also need Microsoft Visio installed - This was built using Visio 2013, 
 
 You will also need to know:
 
-The URL for your vCloud API endpoint - for example, Skyscape = api.vcd.portal.skyscapecloud.com
+ - The URL for your vCloud API endpoint - for example, Skyscape = api.vcd.portal.skyscapecloud.com
 Please note, you do not require HTTP or HTTPS at the start of this.
-Your vCloud Organisation Name/ID
-Your vCloud Organisation UserName
-Your vCloud Organisation Password
+ - Your vCloud Organisation Name/ID
+ - Your vCloud Organisation UserName
+ - Your vCloud Organisation Password
 
 Note: For Skyscape customers, this is available from the Portal via the API dropdown option in the top right menu.
 
 Update the variables at the top of the script:
 
-$Global:API = "api.vcd.portal.skyscapecloud.com"
-$Global:Username = "your_org_user_name"
-$Global:Password = "your_org_password"
-$Global:Org = "your_org"
+ - $Global:API = "api.vcd.portal.skyscapecloud.com"
+ - $Global:Username = "your_org_user_name"
+ - $Global:Password = "your_org_password"
+ - $Global:Org = "your_org"
 
 Save the file
 
