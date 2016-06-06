@@ -15,6 +15,16 @@ Areas included in the structure are:
  - vShield Edges
  - IPSEC VPN's between any vShield Edges within the Same Org
 
+# Screenshots
+
+ - Summary
+![alt tag](https://github.com/skyscape-cloud-services/skyscape-powershell-vcloud-to-visio/blob/master/screenshots/Summary.jpg)
+ - Server Properties
+![alt tag](https://github.com/skyscape-cloud-services/skyscape-powershell-vcloud-to-visio/blob/master/screenshots/ServerData.PNG)
+ - Network Properties
+![alt tag](https://github.com/skyscape-cloud-services/skyscape-powershell-vcloud-to-visio/blob/master/screenshots/NetworkData.PNG)
+
+
 # Requirements
 
 To run the script, you will need PowerCLI installed with the vCloud extensions:
