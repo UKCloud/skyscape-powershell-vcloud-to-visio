@@ -49,6 +49,11 @@ Update the variables at the top of the script:
  - $Global:Username = "your_org_user_name"
  - $Global:Password = "your_org_password"
  - $Global:Org = "your_org"
+ 
+Optionally, you can now also add filters for VDC's and VAPPS to do this, edit the following filter variables:
+
+ - $Global:VAPPFilter = "*myvappname*"
+ - $Global:VDCFilter = "*myvdcname*"
 
 Save the file
 
