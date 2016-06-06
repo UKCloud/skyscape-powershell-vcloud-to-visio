@@ -2,12 +2,32 @@
 # VARIABLES
 #**********************************************************
 
-
 $Global:API = "api.vcd.portal.skyscapecloud.com"
 $Global:Username = "your_org_user_name"
 $Global:Password = "your_org_password"
 $Global:Org = "your_org"
+
+#**********************************************************
+# OPTIONAL FILTERS 
+#
+# You can filter by VDC name and/or by VAPP name 
+# if you just want to draw a specific bit of your
+# cloud environment
+#**********************************************************
+
+$Global:VDCFilter = ""
+$Global:VAPPFilter = ""
+
+#**********************************************************
+# MANAGEMENT HOLDER VARIABLES
+#**********************************************************
+
 $Global:ShapeMaster = @()
+
+# Manipulate Variables Pre Processing
+
+$Global:VDCFilter = [uri]::EscapeDataString($Global:VDCFilter)
+$Global:VAPPFilter = [uri]::EscapeDataString($Global:VAPPFilter)
 
 #**********************************************************
 # Imports and Settings
@@ -86,7 +106,7 @@ Function Add-NetworkProperties($Shape,$NetworkData)
 	}
 }
 
-Function Map-Org()
+Function Map-Org([switch]$JustForDrawing)
 {
 	if(($global:DefaultCIServers | ?{$_.IsConnected -eq $True} | Measure-Object).count -gt 0)
 	{
@@ -100,15 +120,104 @@ Function Map-Org()
 	Write-Host "Connecting to $($Global:API)"
 	Connect-CIServer -Server ($Global:API) -User ($Global:Username) -Password ($Global:Password) -Org ($Global:Org) | Out-Null
 	Write-Host "Getting ORGS"
+
 	$Orgs = Search-Cloud -QueryType Organization
-	Write-Host "Getting VDC's"
-	$VDCs = Search-Cloud -QueryType OrgVDC
+	
+	if($Global:VDCFilter -ne "")
+	{
+		Write-Host "Getting VDC's Matching Name Filter $($Global:VDCFilter)"
+		$VDCs = Search-Cloud -QueryType OrgVDC -filter "Name==$($Global:VDCFilter)"
+		$VDCID = $VDCs[0].id
+		$VDCName = $VDCs[0].Name
+	}
+	else
+	{
+		Write-Host "Getting VDC's"
+		$VDCs = Search-Cloud -QueryType OrgVDC
+	}
+	
 	Write-Host "Getting VAPP's"
-	$VAPPs = Search-Cloud -QueryType VAPP
-	Write-Host "Getting Non Template VM's"
-	$VMs = Search-Cloud -QueryType VM -filter 'IsVappTemplate==False'
+	if($Global:VDCFilter -ne "")
+	{
+		if($Global:VAPPFilter -ne "")
+		{
+			$VAPPs = Search-Cloud -QueryType VAPP -filter "Vdc==$($VDCID);Name==$($Global:VAPPFilter)"
+			$VMs = @()
+			ForEach($V in $VAPPs)
+			{
+				$VAPPID = $V.id
+				$VAPPName = $V.Name
+				Write-Host "Getting Non Template VM's In VDC $($VDCName) and VAPP $($VAPPName)"
+				$VMs += Search-Cloud -QueryType VM -filter "IsVappTemplate==False;Vdc==$($VDCID);Container==$($VAPPID)"
+			}
+			$EdgeGWs = @()
+			$NewVdcs = @()
+			ForEach($V in ($Vapps | Select Vdc -Unique))
+			{
+				$VDCSearch = $VDCs | ?{$_.id -eq $V.vdc} | Select -First 1
+				$NewVdcs += $VDCSearch
+				$EdgeGWs += Search-Cloud -QueryType EdgeGateway -filter "Vdc==$($V.vdc)"
+			}
+			$VDCs = $NewVdcs
+		}
+		else
+		{
+			$VAPPs = Search-Cloud -QueryType VAPP -filter "Vdc==$($VDCID)"
+			$VMs = @()
+			ForEach($V in $VAPPs)
+			{
+				$VAPPID = $V.id
+				Write-Host "Getting Non Template VM's In VDC $($VDCID) and VAPP $($VAPPID)"
+				$VMs += Search-Cloud -QueryType VM -filter "IsVappTemplate==False;Vdc==$($VDCID);Container==$($VAPPID)"
+			}
+			$EdgeGWs = @()
+			$NewVdcs = @()
+			ForEach($V in ($Vapps | Select Vdc -Unique))
+			{
+				$VDCSearch = $VDCs | ?{$_.id -eq $V.vdc} | Select -First 1
+				$NewVdcs += $VDCSearch
+				$EdgeGWs += Search-Cloud -QueryType EdgeGateway -filter "Vdc==$($V.vdc)"
+			}
+			$VDCs = $NewVdcs
+		}
+	}
+	else
+	{
+		if($Global:VAPPFilter -ne "")
+		{
+			#Write-warning "Filtering VAPPS by Name - $($Global:VAPPFilter)"
+			$VAPPs = Search-Cloud -QueryType VAPP -filter "Name==$($Global:VAPPFilter)"
+			$VMs = @()
+			ForEach($V in $VAPPs)
+			{
+				$VAPPID = $V.id
+				Write-Host "Getting Non Template VM's In VAPP $($VAPPID)"
+				$VMs += Search-Cloud -QueryType VM -filter "IsVappTemplate==False;Container==$($VAPPID)"
+				
+			}
+			$EdgeGWs = @()
+			$NewVdcs = @()
+			ForEach($V in ($Vapps | Select Vdc -Unique))
+			{
+				$VDCSearch = $VDCs | ?{$_.id -eq $V.vdc} | Select -First 1
+				$NewVdcs += $VDCSearch
+				$EdgeGWs += Search-Cloud -QueryType EdgeGateway -filter "Vdc==$($V.vdc)"
+			}
+			$VDCs = $NewVdcs
+		}
+		else
+		{
+			$VAPPs = Search-Cloud -QueryType VAPP
+			Write-Host "Getting Non Template VM's"
+			$VMs = Search-Cloud -QueryType VM -filter 'IsVappTemplate==False'
+			$EdgeGWs = Search-Cloud -QueryType EdgeGateway
+		}
+	}
+	
+	
+	
 	Write-Host "Getting Edge Gateways"
-	$EdgeGWs = Search-Cloud -QueryType EdgeGateway
+	
 	Write-Host "Getting Org Networks"
 	$OrgNetworks = Search-Cloud -QueryType OrgNetwork
 	Write-Host "Getting Org VDC Networks"
@@ -116,16 +225,19 @@ Function Map-Org()
 	Write-Host "Getting Catalogs"
 	$VappOrgVDCNetworkRelations = Search-Cloud -QueryType VappOrgVdcNetworkRelation
 	$VappOrgNetworkRelations = Search-Cloud -QueryType VAppOrgNetworkRelation
-	$Catalogs = search-cloud -QueryType Catalog
-	Write-Host "Getting Catalog Items"
-	$CatalogItems = search-cloud -querytype CatalogItem
-	Write-Host "Splitting out vAppTemplates from Media Catalog Items"
-	$CatalogItemsTemplates = $CatalogItems | ?{$_.EntityType -ne "media"}
-	$CatalogItemsMedia = $CatalogItems | ?{$_.EntityType -eq "media"}
-	Write-Host "Getting VApp Templates"
-	$Templates = Search-cloud -querytype VAppTemplate
-	Write-Host "Getting VM's that are Templates"
-	$TemplateVMS = Search-Cloud -QueryType VM -filter 'IsVappTemplate==True'
+	if(!$JustForDrawing)
+	{
+		$Catalogs = search-cloud -QueryType Catalog
+		Write-Host "Getting Catalog Items"
+		$CatalogItems = search-cloud -querytype CatalogItem
+		Write-Host "Splitting out vAppTemplates from Media Catalog Items"
+		$CatalogItemsTemplates = $CatalogItems | ?{$_.EntityType -ne "media"}
+		$CatalogItemsMedia = $CatalogItems | ?{$_.EntityType -eq "media"}
+		Write-Host "Getting VApp Templates"
+		$Templates = Search-cloud -querytype VAppTemplate
+		Write-Host "Getting VM's that are Templates"
+		$TemplateVMS = Search-Cloud -QueryType VM -filter 'IsVappTemplate==True'
+	}
 	Write-Host "Getting additional data"
 	$VAPPNetworks = Search-Cloud -QueryType VAPPNetwork
 	#VMTree
@@ -330,7 +442,7 @@ Function Draw-Vapp($page,$vms,$mastercontainer,$server,$data,$networkmaster,$Dyn
 				$con = Connect-VisioObject -Page $Page -FirstObj $TheShape -SecondObj $Holder
 				$con.Text = $NetworkName.IPAddress# + "`r`n" + $NetworkName.Macaddress + "`r`nMode: " + $NetworkName.IpAddressAllocationMode + "`r`nConnected: " + $NetworkName.IsConnected
 				$con.Cells("TxtPinX").Formula = "= POINTALONGPATH( Geometry1.Path, 0 )"
-				$con.Cells("TxtPinY").Formula = "= POINTALONGPATH( Geometry1.Path, 0.1 )-1"
+				$con.Cells("TxtPinY").Formula = "= POINTALONGPATH( Geometry1.Path, 0 )-$($VAPPNetworkI)"
 				$SavedShape = Save-ShapeLookup -Shape $con
 				$ConnectedVMs += $TheShape
 			}
@@ -440,7 +552,7 @@ Function Draw-GW($page,$data,$DynamicConnectorMaster,$FWMaster,$mastercontainer)
 			}
 			
 			$GWContainerX = $MostLeft
-			$GWContainerY = $CurrentY - $Tallest - (50/25.4)
+			$GWContainerY = $CurrentY - $Tallest - (75/25.4)
 			Write-Host "GWContainerX = $GWContainerX GWContainerY = $GWContainerY"
 			
 			$GWContainer = $page.Drop($mastercontainer,$GWContainerX,$GWContainerY)
@@ -494,6 +606,7 @@ Function Draw-GW($page,$data,$DynamicConnectorMaster,$FWMaster,$mastercontainer)
 				$GWStartX += 1.5
 			
 			}
+			$GWContainer.Cells("Height").ResultIU = $GWContainer.Cells("Height").ResultIU + 0.5
 			$ThisVDCContainer.ContainerProperties.AddMember($GWContainer,1)
 		}
 		else
@@ -530,6 +643,12 @@ $document.DiagramServicesEnabled = $DServiceSet
 #**********************************************************
 # MAIN PROCESS
 #**********************************************************
+
+
+
+#Get the data
+
+$Data = Map-Org -JustForDrawing
 
 #Initialise VISIO
 $Visio = New-Object -ComObject Visio.Application 
@@ -578,12 +697,21 @@ ForEach($Prop in $PropertyList)
 {
 	$NewRow = $EditShape.addnamedrow(243,"$($Prop)",0)
 }
+#Get rid of all of those annoying default lines in this shape
+$EditShape.CellsSRC(9, 0, 0).FormulaU = "0"
+$EditShape.CellsSRC(9, 0, 1).FormulaU = "0"
+$EditShape.CellsSRC(9, 1, 0).FormulaU = "0"
+$EditShape.CellsSRC(9, 1, 1).FormulaU = "0"
+$EditShape.CellsSRC(9, 2, 0).FormulaU = "0"
+$EditShape.CellsSRC(9, 2, 1).FormulaU = "0"
+$EditShape.CellsSRC(9, 3, 0).FormulaU = "0"
+$EditShape.CellsSRC(9, 3, 1).FormulaU = "0"
+$EditShape.CellsSRC(9, 4, 0).FormulaU = "0"
+$EditShape.CellsSRC(9, 4, 1).FormulaU = "0"
+$EditShape.CellsSRC(9, 5, 0).FormulaU = "0"
+$EditShape.CellsSRC(9, 5, 1).FormulaU = "0"
 $eNetwork.close()
 
-
-#Get the data
-
-$Data = Map-Org
 
 #MAP The data
 
@@ -621,7 +749,7 @@ ForEach($VDC in $data.vdcs)
 		$VAPPP = ($VAPPI/$VAPPTotal)*100
 		write-progress -Status "Processing VAPPS" -Activity "$($Vapp.name)" -PercentComplete $VAPPP -Id 1
 		$thiscontainer = Draw-Vapp -page $page -vms ($vapp.group) -mastercontainer $mastercontainer -server $server -data $data -networkmaster $networkmaster -DynamicConnectorMaster $DynamicConnectorMaster -startx ($X+$RightShift) -starty $Y
-		$RightShift += $thiscontainer.Cells("Width").ResultIU 
+		$RightShift += $thiscontainer.Cells("Width").ResultIU + 0.5
 		$NextStart = ($RightShift + $X)*25.4 + ($thiscontainer.Cells("PinX").ResultIU * 25.4)
 		Write-Host "Next VAPP Should be Drawn at X = $NextStart mm"
 		Write-Host "Last VAPP Width = $($RightShift * 25.4)"
@@ -639,18 +767,11 @@ ForEach($VDC in $data.vdcs)
 	
 }
 
-Start-Sleep -Seconds 5
+#start-sleep -Seconds 5
 
-#Updated VAPP Container Shapes to look a bit different to VDC's
-$VAPPContainers = $Global:ShapeMaster | ?{$_.Name -like "*VAPP*"} | ?{$_.Name -notlike "*NETWORK*"}
-ForEach($VC in $VappContainers)
-{
-	$Page.shapes.ItemFromID($VC.id).CellsSRC(1, 2, 0).FormulaU = "2.25 pt"
-	$Page.shapes.ItemFromID($VC.id).CellsSRC(1, 2, 2).FormulaU = "2"
-	$Page.shapes.ItemFromID($VC.id).CellsSRC(1, 2, 3).FormulaU = "11.338582677165 pt"
-}
 
-Start-Sleep -Seconds 5
+
+#start-sleep -Seconds 5
 
 #Set VDC Heights to be Uniform
 $VDCS = Get-ShapeFromLookup -Page $Page -NameFilter ":VDC:"
@@ -669,7 +790,7 @@ ForEach($V in $VDCS)
 
 
 
-Start-Sleep -Seconds 5
+#start-sleep -Seconds 5
 
 #Set VAPP Heights to be Uniform
 $VAPPS = Get-ShapeFromLookup -Page $Page -NameFilter ":VAPP:" | ?{$_.name -notlike "*network*"}
@@ -682,18 +803,27 @@ ForEach($V in $VAPPS)
 
 }
 
-start-sleep -Seconds 5
+#start-sleep -Seconds 5
 #Draw vShield Edge Gateways
 Draw-GW -page $page -data $data -DynamicConnectorMaster $DynamicConnectorMaster -FWMaster $FWMaster -mastercontainer $mastercontainer
 
-Start-Sleep -Seconds 5
+#Updated VAPP Container Shapes to look a bit different to VDC's
+$VAPPContainers = $Global:ShapeMaster | ?{($_.Name -like "*VAPP*") -or ($_.Text -eq "vShield Edge Gateways")} | ?{$_.Name -notlike "*NETWORK*"}
+ForEach($VC in $VappContainers)
+{
+	$Page.shapes.ItemFromID($VC.id).CellsSRC(1, 2, 0).FormulaU = "2.25 pt"
+	$Page.shapes.ItemFromID($VC.id).CellsSRC(1, 2, 2).FormulaU = "2"
+	$Page.shapes.ItemFromID($VC.id).CellsSRC(1, 2, 3).FormulaU = "11.338582677165 pt"
+}
+
+#start-sleep -Seconds 5
 #Align VDC's against each other
 $VDCS = Get-ShapeFromLookup -Page $Page -NameFilter ":VDC:"
 #$page.Shapes | ?{$_.name -like "*VDC*"}
 
 $counter = 0
 $X = [double]$VDCS[0].Cells("PinX").ResultIU * 25.4
-$GapMM = 20
+$GapMM = 200
 $GapIU = $GapMM/25.4
 $Width = 0
 ForEach($V in $VDCS)
@@ -761,10 +891,17 @@ ForEach($VPN in $P2PVPNS)
 {
 	$FirstFWID = $global:ShapeMaster | ?{$_.Name -eq $VPN.LocalID}
 	$SecondFWID = $global:ShapeMaster | ?{$_.Name -eq $VPN.PeerID}
-	$FirstFW = $Page.Shapes.ItemFromID($FirstFWID.ID)
-	$SecondFW = $Page.Shapes.ItemFromID($SecondFWID.ID)
-	$con = Connect-VisioObject -Page $Page -FirstObj $FirstFW -SecondObj $SecondFW
-	$con.text = "$($VPN.Name): VPN $($VPN.LocalIP) to $($VPN.PeerIP)"
+	if(((($FirstFWID | Measure-Object).count -gt 0) -and ($SecondFWID | Measure-Object).count -gt 0))
+	{
+		$FirstFW = $Page.Shapes.ItemFromID($FirstFWID.ID)
+		$SecondFW = $Page.Shapes.ItemFromID($SecondFWID.ID)
+		$con = Connect-VisioObject -Page $Page -FirstObj $FirstFW -SecondObj $SecondFW
+		$con.text = "$($VPN.Name): VPN $($VPN.LocalIP) to $($VPN.PeerIP)"
+	}
+	else
+	{
+		Write-Host "Could not find all Firewalls on this document to connect $($VPN.LocalID) to $($VPN.PeerID)"
+	}
 }
 $Page.ResizeToFitContents()
 
